@@ -55,6 +55,9 @@ export function InputFormBuilderPage() {
     Record<number, number>
   >({})
   const [inputTypes, setInputTypes] = useState<InputType[]>([])
+  const [moveTargetByField, setMoveTargetByField] = useState<
+    Record<number, number>
+  >({})
 
   const loadMatchForm = () => {
     setLoadingStatus('sending')
@@ -172,6 +175,29 @@ export function InputFormBuilderPage() {
     setSelectedCriterionByGroup((prev) => ({
       ...prev,
       [groupId]: criterionId,
+    }))
+  }
+
+  const handleMoveTargetChange = (fieldId: number, targetGroupId: number) => {
+    setMoveTargetByField((prev) => ({
+      ...prev,
+      [fieldId]: targetGroupId,
+    }))
+  }
+
+  const moveField = (fieldId: number) => {
+    const targetGroupId = moveTargetByField[fieldId]
+    if (!targetGroupId) return
+
+    setFields((prev) =>
+      prev.map((f) => (f.id === fieldId ? { ...f, groupId: targetGroupId } : f))
+    )
+    setConfirmDisabled(false)
+
+    // reset the dropdown back to un‑selected (optional)
+    setMoveTargetByField((prev) => ({
+      ...prev,
+      [fieldId]: 0,
     }))
   }
 
@@ -293,6 +319,40 @@ export function InputFormBuilderPage() {
                                       setFields={setFields}
                                       setConfirmDisabled={setConfirmDisabled}
                                     />
+                                  </div>
+                                  <div>
+                                    <span className="my-2">
+                                      Current Group: {group.name}
+                                    </span>
+                                    <Field
+                                      value={moveTargetByField[field.id] || 0}
+                                      onChange={(e) =>
+                                        handleMoveTargetChange(
+                                          field.id,
+                                          +e.target.value
+                                        )
+                                      }
+                                      config={{
+                                        type: 'select',
+                                        label: 'Move To:',
+                                        name: 'moveToGroup',
+                                        placeholder: 'Select One',
+                                        options: groups
+                                          .filter((g) => g.id !== group.id)
+                                          .map((g) => ({
+                                            value: g.id,
+                                            label: g.name,
+                                          })),
+                                      }}
+                                    />
+                                    <Button
+                                      size="small"
+                                      otherClassName="mt-2"
+                                      onClick={() => moveField(field.id)}
+                                      disabled={!moveTargetByField[field.id]}
+                                    >
+                                      Move
+                                    </Button>
                                   </div>
                                 </FieldWrapper>
                               </div>

@@ -2,10 +2,19 @@ import type { StudyVersionStatus } from '../model'
 import { StudyVersion } from '../model'
 import { fetchGearbox } from './utils'
 
-export function getStudyVersions(status: StudyVersionStatus) {
-  return fetchGearbox(`/gearbox/study-versions/${status}`).then(
-    (res) => res.json() as Promise<StudyVersion[]>
-  )
+export function getStudyVersions(
+  status: StudyVersionStatus
+): Promise<StudyVersion[]> {
+  return fetchGearbox(`/gearbox/study-versions/${status}`).then((res) => {
+    if (res.status === 404) {
+      // If the endpoint returns 404, return an empty array instead of throwing
+      return [] as StudyVersion[]
+    }
+    if (!res.ok) {
+      throw new Error('Failed to get study versions')
+    }
+    return res.json() as Promise<StudyVersion[]>
+  })
 }
 
 export function getStudyVersionById(id: number) {

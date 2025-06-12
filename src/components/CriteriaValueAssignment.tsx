@@ -13,6 +13,7 @@ import { publishElCriteriaHasCriterion } from '../api/elCriteriaHasCriterion'
 import { createValue } from '../api/value'
 import { updateCriterionStaging } from '../api/criterionStaging'
 import { RequestStatusBar } from './RequestStatusBar'
+import { createUnit } from '../api/units'
 
 export function CriteriaValueAssignment({
   stagingCriterion,
@@ -20,14 +21,15 @@ export function CriteriaValueAssignment({
   numericValues,
   setNumericValues,
   units,
+  setUnits,
 }: {
   stagingCriterion: CriterionStagingWithValueList
   numericValues: CriteriaValue[]
   inputTypes: InputType[]
   setNumericValues: React.Dispatch<React.SetStateAction<CriteriaValue[]>>
   units: Unit[]
+  setUnits: React.Dispatch<React.SetStateAction<Unit[]>>
 }) {
-  // const [valueId, setValueId] = useState<number>(0)
   const [echcValueIds, setEchcValueIds] = useState<number[]>(
     stagingCriterion.echc_value_ids &&
       stagingCriterion.echc_value_ids.length > 0
@@ -36,7 +38,7 @@ export function CriteriaValueAssignment({
   )
   const [operator, setOperator] = useState<ComparisonOperator | ''>('')
   const [valueString, setValueString] = useState<string>('')
-  const [unit, setUnit] = useState<Unit | null>(null)
+  const [unit, setUnit] = useState<[Unit] | []>([])
   const [addValueStatus, setAddValueStatus] = useState<ApiStatus>('not started')
   const [saveValueStatus, setSaveValueStatus] =
     useState<ApiStatus>('not started')
@@ -47,6 +49,7 @@ export function CriteriaValueAssignment({
   const [valuesPublished, setValuesPublished] = useState<boolean>(
     stagingCriterion.echc_adjudication_status === 'ACTIVE'
   )
+  const [isCreatingUnit, setIsCreatingUnit] = useState<boolean>(false)
   const isSendingAddReq = addValueStatus === 'sending'
   const isSendingSaveReq = saveValueStatus === 'sending'
 
@@ -133,15 +136,15 @@ export function CriteriaValueAssignment({
   }
   const addNumericValue = (event: React.FormEvent) => {
     event.preventDefault()
-    if (unit && operator && valueString) {
+    if (unit[0] && operator && valueString) {
       setAddValueStatus('sending')
       createValue({
         id: 0,
-        description: `${operator} ${valueString} ${unit.name}`,
+        description: `${operator} ${valueString} ${unit[0].name}`,
         operator,
         value_string: valueString,
-        unit_id: unit.id,
-        unit_name: unit.name,
+        unit_id: unit[0].id,
+        unit_name: unit[0].name,
         is_numeric: true,
         active: true,
       })
@@ -157,7 +160,7 @@ export function CriteriaValueAssignment({
         .finally(() => {
           setOperator('')
           setValueString('')
-          setUnit(null)
+          setUnit([])
           timerIdRef.current = setTimeout(
             () => setAddValueStatus('not started'),
             3000
@@ -183,6 +186,18 @@ export function CriteriaValueAssignment({
         }
       })
 
+  const createNewUnit = (
+    newUnitLabel: string
+  ): Promise<{ value: number; label: string }> => {
+    setIsCreatingUnit(true)
+    return createUnit({ id: 0, name: newUnitLabel })
+      .then((res) => {
+        setUnit([res])
+        setUnits([...units, res])
+        return { value: res.id, label: res.name }
+      })
+      .finally(() => setIsCreatingUnit(false))
+  }
   return (
     <>
       <div className="my-4 p-4 border border-gray-400">
@@ -283,7 +298,7 @@ export function CriteriaValueAssignment({
                         name: 'valueString',
                         placeholder: 'Enter a numeric value',
                         label: 'Value String: ',
-                        step: unit?.name === 'years' ? 1 : 0.1,
+                        step: unit[0]?.name === 'years' ? 1 : 0.1,
                       }}
                       value={valueString}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -292,21 +307,36 @@ export function CriteriaValueAssignment({
                     />
                     <Field
                       config={{
-                        type: 'select',
+                        type: 'multiselect',
                         name: 'unit',
-                        placeholder: 'Select a Unit',
                         label: 'Unit: ',
                         options: units.map((u) => ({
                           value: u.id,
                           label: u.name,
                         })),
+                        hasSelectAll: false,
+                        onCreateOption: createNewUnit,
+                        isLoading: isCreatingUnit,
+                        className: 'w-48',
                       }}
-                      value={unit?.id || 0}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                        setUnit({
-                          id: +e.target.value,
-                          name: e.target.options[e.target.selectedIndex].text,
-                        })
+                      value={
+                        unit[0]
+                          ? [{ value: unit[0].id, label: unit[0].name }]
+                          : []
+                      }
+                      onChange={(
+                        newUnits: { label: string; value: number }[]
+                      ) => {
+                        if (newUnits.length) {
+                          setUnit([
+                            {
+                              id: newUnits[newUnits.length - 1].value,
+                              name: newUnits[newUnits.length - 1].label,
+                            },
+                          ])
+                        } else {
+                          setUnit([])
+                        }
                       }}
                     />
                   </div>

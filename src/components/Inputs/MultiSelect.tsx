@@ -9,23 +9,27 @@ type MultiSelectProps = {
   name?: string
   options: MatchFormFieldOption[]
   disabled?: boolean
-  placeholder?: string
   value?: MatchFormFieldOption[]
   onChange?(event: any): void
-  onCreateOptions?(label: string): void
+  onCreateOption?(label: string): void
   isCreatable?: boolean
   isLoading?: boolean
+  hasSelectAll?: boolean
+  closeOnChangedValue?: boolean
+  className?: string
 }
 
 function MultiSelect({
   label,
   name,
   options,
-  placeholder,
   value = [],
   disabled,
   isCreatable = true,
   isLoading = false,
+  hasSelectAll = true,
+  closeOnChangedValue = false,
+  className = '',
   ...attrs
 }: MultiSelectProps) {
   const baseClassName = 'flex flex-col'
@@ -37,10 +41,13 @@ function MultiSelect({
     options,
     isCreatable,
     isLoading,
+    hasSelectAll,
+    closeOnChangedValue,
+    className,
   }
 
   return (
-    <div className={baseClassName}>
+    <div className={`${baseClassName} ${className}`}>
       {label && (
         <label className="mb-1" htmlFor={name}>
           {label}

@@ -38,6 +38,7 @@ export function CriteriaAnnotationVerification({
     CriterionStaging['criterion_adjudication_status']
   >(stagingCriterion.criterion_adjudication_status)
 
+  const [showCancel, setShowCancel] = useState<boolean>(false)
   const isEditable = status === 'NEW' || status === 'IN_PROCESS'
 
   const [selectedValues, setSelectedValues] = useState<MatchFormFieldOption[]>(
@@ -92,6 +93,7 @@ export function CriteriaAnnotationVerification({
         setApiStatus('success')
         setStatus('IN_PROCESS')
         setCanPublish(true)
+        setShowCancel(false)
       })
       .catch((err) => {
         console.error(err)
@@ -149,7 +151,14 @@ export function CriteriaAnnotationVerification({
     }
   }
 
-  const edit = () => setStatus('IN_PROCESS')
+  const edit = () => {
+    setStatus('IN_PROCESS')
+    setShowCancel(true)
+  }
+  const cancel = () => {
+    setStatus('EXISTING')
+    setShowCancel(false)
+  }
 
   const accept = () => {
     if (
@@ -235,12 +244,14 @@ export function CriteriaAnnotationVerification({
             <RequestStatusBar apiStatus={apiStatus} errorMsg={errorMsg} />
             <ActionButtons
               status={status}
+              showCancel={showCancel}
               isSendingReq={isSendingReq}
               canPublish={canPublish}
               save={save}
               publish={publish}
               edit={edit}
               accept={accept}
+              cancel={cancel}
             />
           </div>
         </div>
@@ -324,24 +335,33 @@ export function CriteriaAnnotationVerification({
 
 function ActionButtons({
   status,
+  showCancel,
   isSendingReq,
   canPublish,
   save,
   publish,
   edit,
   accept,
+  cancel,
 }: {
   status: CriterionStaging['criterion_adjudication_status']
+  showCancel: boolean
   isSendingReq: boolean
   canPublish: boolean
   save: () => void
   publish: () => void
   edit: () => void
   accept: () => void
+  cancel: () => void
 }) {
   if (status === 'NEW' || status === 'IN_PROCESS') {
     return (
       <>
+        {showCancel && (
+          <Button size="small" otherClassName="mr-4" onClick={cancel}>
+            Cancel
+          </Button>
+        )}
         <Button
           size="small"
           otherClassName="mr-4"

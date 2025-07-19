@@ -12,3 +12,9 @@ export function getCriterion(id: number): Promise<Criterion> {
     (res) => res.json() as Promise<Criterion>
   )
 }
+
+export function getCriteria(): Promise<Criterion[]> {
+  return fetchGearbox('/gearbox/criteria')
+    .then((res) => res.json() as Promise<{ results: Criterion[] }>)
+    .then((res) => res.results)
+}

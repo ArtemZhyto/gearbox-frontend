@@ -155,10 +155,6 @@ export function CriteriaAnnotationVerification({
             const updated: CriterionStagingWithValueList = {
               ...prev,
               criterion_adjudication_status: 'ACTIVE',
-              display_name: displayName,
-              description,
-              // keep currently selected values and other fields as-is
-              // criterion_value_list: prev.criterion_value_list,
             }
             onStagingUpdated?.(updated)
             return updated

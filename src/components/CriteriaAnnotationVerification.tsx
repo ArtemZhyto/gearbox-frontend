@@ -26,12 +26,14 @@ export function CriteriaAnnotationVerification({
   lookupValues,
   inputTypes,
   setLookupValues,
+  onStagingUpdated,
 }: {
   stagingCriterion: CriterionStagingWithValueList
   criteria: Criterion[]
   lookupValues: CriteriaValue[]
   inputTypes: InputType[]
   setLookupValues: React.Dispatch<React.SetStateAction<CriteriaValue[]>>
+  onStagingUpdated: (updated: CriterionStagingWithValueList) => void
 }) {
   const checkIsList = (id: number): boolean => {
     return (
@@ -101,12 +103,13 @@ export function CriteriaAnnotationVerification({
       .then(({ criterion_value_ids, ...rest }) => {
         setApiStatus('success')
         setCanPublish(true)
-        setStagingCriterion(() => ({
+        const idSet = new Set(criterion_value_ids)
+        const updated: CriterionStagingWithValueList = {
           ...rest,
-          criterion_value_list: lookupValues.filter((v) =>
-            new Set(criterion_value_ids).has(v.id)
-          ),
-        }))
+          criterion_value_list: lookupValues.filter((v) => idSet.has(v.id)),
+        }
+        setStagingCriterion(updated)
+        onStagingUpdated(updated)
       })
       .catch((err) => {
         console.error(err)
@@ -147,10 +150,15 @@ export function CriteriaAnnotationVerification({
       })
         .then(() => {
           setApiStatus('success')
-          setStagingCriterion((prev) => ({
-            ...prev,
-            criterion_adjudication_status: 'ACTIVE',
-          }))
+          // Use functional set to build the exact object we store + send up
+          setStagingCriterion((prev) => {
+            const updated: CriterionStagingWithValueList = {
+              ...prev,
+              criterion_adjudication_status: 'ACTIVE',
+            }
+            onStagingUpdated?.(updated)
+            return updated
+          })
         })
         .catch((err) => {
           setErrorMsg(err.message)
@@ -213,10 +221,21 @@ export function CriteriaAnnotationVerification({
         .then(() => acceptCriterionStaging(id))
         .then(() => {
           setApiStatus('success')
-          setStagingCriterion((prev) => ({
-            ...prev,
-            criterion_adjudication_status: 'ACTIVE',
-          }))
+          setStagingCriterion((prev) => {
+            const updated: CriterionStagingWithValueList = {
+              ...prev,
+              // reflect accepted -> ACTIVE and sync fields from the chosen existing criterion
+              criterion_adjudication_status: 'ACTIVE',
+              code,
+              display_name,
+              description,
+              input_type_id,
+              // keep values in sync with what we just saved
+              criterion_value_list: values ?? prev.criterion_value_list ?? [],
+            }
+            onStagingUpdated?.(updated)
+            return updated
+          })
         })
         .catch((err) => {
           console.error(err)

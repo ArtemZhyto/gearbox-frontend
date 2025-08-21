@@ -17,21 +17,11 @@ import { getValues } from '../api/value'
 import { getCriterionStaging } from '../api/criterionStaging'
 import { getCriteria } from '../api/criterion'
 import Button from '../components/Inputs/Button'
+import { useManageItemScrollPosition } from '../hooks/useManageItemScrollPosition'
+import DropdownSection from '../components/DropdownSection'
 
 type Status = CriterionStaging['criterion_adjudication_status']
 const statusOrder: Status[] = ['NEW', 'IN_PROCESS', 'EXISTING', 'ACTIVE']
-
-function getEffectiveStatus(
-  sc: CriterionStagingWithValueList,
-  criteria: Criterion[]
-): Status {
-  if (sc.criterion_adjudication_status === 'ACTIVE') {
-    return 'ACTIVE'
-  }
-  return criteria.some((c) => c.code === sc.code)
-    ? 'EXISTING'
-    : sc.criterion_adjudication_status
-}
 
 export function CriteriaAnnotationVerificationPage() {
   const [studyVersionsAdjudication, setStudyVersionsAdjudication] = useState<
@@ -48,10 +38,29 @@ export function CriteriaAnnotationVerificationPage() {
   const [inputTypes, setInputTypes] = useState<InputType[]>([])
   const [loadingStatus, setLoadingStatus] = useState<ApiStatus>('not started')
 
-  // Back to top
-  const topRef = useRef<HTMLDivElement | null>(null)
-  const [showBackToTop, setShowBackToTop] = useState(false)
-
+  const {
+    topRef,
+    createScrollItemRef,
+    scrollToItem,
+    scrollToTop,
+    showBackToTop,
+  } = useManageItemScrollPosition<number>({
+    topOffset: 96, // set to sticky header height; use 0 if relying on CSS scroll-mt
+    behavior: 'smooth',
+    trackBackToTop: true,
+    onAfterScrollToItem: (el) => {
+      // optional flash highlight, replaces old class toggling
+      el.classList.add('ring-2', 'ring-blue-500', 'ring-offset-2', 'rounded')
+      setTimeout(() => {
+        el.classList.remove(
+          'ring-2',
+          'ring-blue-500',
+          'ring-offset-2',
+          'rounded'
+        )
+      }, 1200)
+    },
+  })
   // Collapsible groups
   const [open, setOpen] = useState<Record<Status, boolean>>({
     NEW: true,
@@ -59,61 +68,6 @@ export function CriteriaAnnotationVerificationPage() {
     EXISTING: true,
     ACTIVE: true,
   })
-
-  // Per-item refs + pending-scroll
-  const itemRefs = useRef<Map<number, HTMLDivElement | null>>(new Map())
-  const [pendingScrollId, setPendingScrollId] = useState<number | null>(null)
-  const pendingScrollIdRef = useRef<number | null>(null)
-
-  const registerItemRef = (id: number) => (el: HTMLDivElement | null) => {
-    if (el) {
-      itemRefs.current.set(id, el)
-      // If this is the row we're waiting for, scroll now (post-paint)
-      if (pendingScrollIdRef.current === id) {
-        requestAnimationFrame(() => {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          // Optional highlight
-          el.classList.add(
-            'ring-2',
-            'ring-blue-500',
-            'ring-offset-2',
-            'rounded'
-          )
-          setTimeout(() => {
-            el.classList.remove(
-              'ring-2',
-              'ring-blue-500',
-              'ring-offset-2',
-              'rounded'
-            )
-          }, 1200)
-        })
-        pendingScrollIdRef.current = null
-        setPendingScrollId(null)
-      }
-    } else {
-      itemRefs.current.delete(id)
-    }
-  }
-
-  // Fallback retry (in case layout shifts)
-  useEffect(() => {
-    if (pendingScrollId == null) return
-    let tries = 0
-    let raf = 0
-    const tick = () => {
-      const el = itemRefs.current.get(pendingScrollId)
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        setPendingScrollId(null)
-        return
-      }
-      if (tries++ < 8) raf = requestAnimationFrame(tick)
-      else setPendingScrollId(null)
-    }
-    raf = requestAnimationFrame(() => requestAnimationFrame(tick))
-    return () => cancelAnimationFrame(raf)
-  }, [pendingScrollId])
 
   const loadPage = () => {
     Promise.all([
@@ -138,18 +92,7 @@ export function CriteriaAnnotationVerificationPage() {
   useEffect(() => {
     setLoadingStatus('sending')
     loadPage()
-    const onScroll = () => setShowBackToTop(window.scrollY > 400)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
   }, [])
-
-  const scrollToTop = () => {
-    if (topRef.current) {
-      topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
-  }
 
   const onStudyChanged = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const ebcId = +event.target.value
@@ -164,11 +107,11 @@ export function CriteriaAnnotationVerificationPage() {
   // Group once, render many
   const grouped = useMemo(() => {
     return stagingCriteria.reduce((acc, sc) => {
-      const st = getEffectiveStatus(sc, criteria)
+      const st = sc.criterion_adjudication_status
       ;(acc[st] ??= []).push(sc)
       return acc
     }, {} as Record<Status, CriterionStagingWithValueList[]>)
-  }, [stagingCriteria, criteria])
+  }, [stagingCriteria])
 
   const counts = {
     NEW: grouped.NEW?.length ?? 0,
@@ -183,11 +126,8 @@ export function CriteriaAnnotationVerificationPage() {
       prev.map((x) => (x.id === updated.id ? updated : x))
     )
 
-    const newStatus = getEffectiveStatus(updated, criteria)
-    setOpen((o) => ({ ...o, [newStatus]: true })) // ensure target group is open
-
-    pendingScrollIdRef.current = updated.id // for ref callback
-    setPendingScrollId(updated.id) // for fallback effect
+    setOpen((o) => ({ ...o, [updated.criterion_adjudication_status]: true })) // ensure target group is open
+    scrollToItem(updated.id) // hook defers until the item mounts if needed
   }
 
   if (loadingStatus === 'not started' || loadingStatus === 'sending') {
@@ -198,12 +138,14 @@ export function CriteriaAnnotationVerificationPage() {
   }
 
   return (
-    <div ref={topRef}>
+    <div>
+      {/* top sentinel: NOT sticky; first child in the scroll area */}
+      <div ref={topRef} className="h-px w-px" aria-hidden />
       {showBackToTop && (
         <Button
           size="small"
-          onClick={scrollToTop}
-          otherClassName="fixed bottom-6 right-6 rounded-full shadow-lg"
+          onClick={() => scrollToTop()}
+          otherClassName="fixed bottom-6 right-6 rounded-full shadow-lg z-50"
           aria-label="Back to top"
         >
           Back to Top
@@ -249,42 +191,33 @@ export function CriteriaAnnotationVerificationPage() {
         if (!list.length) return null
 
         return (
-          <div key={st} id={`section-${st}`} className="mt-6 scroll-mt-24">
-            {/* Sticky/collapsible header */}
-            <div className="sticky top-0 z-10 bg-white border-b py-2 flex items-center justify-between">
-              <h2 className="font-semibold">
-                {st.replace('_', ' ')} ({list.length})
-              </h2>
-              <button
-                className="text-sm underline"
-                onClick={() => setOpen((o) => ({ ...o, [st]: !o[st] }))}
+          <DropdownSection
+            key={st}
+            id={`section-${st}`} // keeps jump bar working
+            name={`${st.replace('_', ' ')} (${list.length})`}
+            isOpen={open[st]} // controlled by state
+            onToggle={(next) => setOpen((o) => ({ ...o, [st]: next }))}
+            backgroundColor="bg-white"
+            headerClassName="top-0" // matches previous sticky top-0
+          >
+            {list.map((sc) => (
+              <div
+                key={sc.id}
+                ref={createScrollItemRef(sc.id)}
+                id={`crit-${sc.id}`}
+                className="scroll-mt-24"
               >
-                {open[st] ? 'Collapse' : 'Expand'}
-              </button>
-            </div>
-
-            {open[st] && (
-              <div className="mt-2">
-                {list.map((sc) => (
-                  <div
-                    key={sc.id}
-                    ref={registerItemRef(sc.id)}
-                    id={`crit-${sc.id}`}
-                    className="scroll-mt-24"
-                  >
-                    <CriteriaAnnotationVerification
-                      stagingCriterion={sc}
-                      criteria={criteria}
-                      lookupValues={values}
-                      inputTypes={inputTypes}
-                      setLookupValues={setValues}
-                      onStagingUpdated={handleStagingUpdated}
-                    />
-                  </div>
-                ))}
+                <CriteriaAnnotationVerification
+                  stagingCriterion={sc}
+                  criteria={criteria}
+                  lookupValues={values}
+                  inputTypes={inputTypes}
+                  setLookupValues={setValues}
+                  onStagingUpdated={handleStagingUpdated}
+                />
               </div>
-            )}
-          </div>
+            ))}
+          </DropdownSection>
         )
       })}
     </div>

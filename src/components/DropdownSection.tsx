@@ -1,12 +1,17 @@
+// DropdownSection.tsx
 import type React from 'react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ChevronUp, ChevronDown } from 'react-feather'
 
 type DropdownSectionProps = {
-  name: string
+  name: string | React.ReactNode
   backgroundColor?: string
   children: React.ReactNode
-  isCollapsedAtStart?: boolean
+  isCollapsedAtStart?: boolean // for uncontrolled only
+  isOpen?: boolean // controlled
+  onToggle?: (next: boolean) => void // controlled
+  id?: string // for jump links
+  headerClassName?: string // optional styling
 }
 
 function DropdownSection({
@@ -14,40 +19,58 @@ function DropdownSection({
   backgroundColor = 'bg-inherit',
   children,
   isCollapsedAtStart,
+  isOpen,
+  onToggle,
+  id,
+  headerClassName = 'top-10',
 }: DropdownSectionProps) {
-  const [isDropDownOpen, setIsDropDownOpen] = useState(!isCollapsedAtStart)
-  const handleOpen = (e: React.SyntheticEvent) => {
-    e.preventDefault()
-    setIsDropDownOpen(true)
-  }
-  const handleClose = (e: React.SyntheticEvent) => {
-    e.preventDefault()
-    setIsDropDownOpen(false)
-  }
-  const isFirefox = navigator.userAgent.includes('Firefox')
+  const [internalOpen, setInternalOpen] = useState(!isCollapsedAtStart)
+  const open = typeof isOpen === 'boolean' ? isOpen : internalOpen
+  const setOpen = (next: boolean) =>
+    typeof isOpen === 'boolean' ? onToggle?.(next) : setInternalOpen(next)
+
+  const isFirefox = useMemo(
+    () =>
+      typeof navigator !== 'undefined' && /Firefox/i.test(navigator.userAgent),
+    []
+  )
+
   return (
     <section
+      id={id}
       className={`my-4 ${backgroundColor} ${
         isFirefox ? 'transition-inherit' : ''
       }`}
     >
       <div
-        className={`flex sticky top-10 py-2 justify-between border-b border-solid border-black z-[5] ${backgroundColor} ${
+        className={`flex sticky py-2 justify-between border-b border-solid border-black z-[5] ${backgroundColor} ${headerClassName} ${
           isFirefox ? 'transition-inherit' : ''
         }`}
       >
         <h2 className="font-bold">{name}</h2>
-        {isDropDownOpen ? (
-          <button onClick={handleClose} aria-label="Collapse dropdown">
+        {open ? (
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              setOpen(false)
+            }}
+            aria-label="Collapse"
+          >
             <ChevronUp color="#C00" />
           </button>
         ) : (
-          <button onClick={handleOpen} aria-label="Expand dropdown">
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              setOpen(true)
+            }}
+            aria-label="Expand"
+          >
             <ChevronDown />
           </button>
         )}
       </div>
-      {isDropDownOpen && children}
+      {open && <div className="mt-2">{children}</div>}
     </section>
   )
 }

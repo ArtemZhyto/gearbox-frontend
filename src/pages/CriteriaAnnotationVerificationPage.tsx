@@ -45,11 +45,11 @@ export function CriteriaAnnotationVerificationPage() {
     scrollToTop,
     showBackToTop,
   } = useManageItemScrollPosition<number>({
-    topOffset: 96, // set to your sticky header height; use 0 if relying on CSS scroll-mt
+    topOffset: 96, // set to sticky header height; use 0 if relying on CSS scroll-mt
     behavior: 'smooth',
     trackBackToTop: true,
     onAfterScrollToItem: (el) => {
-      // optional flash highlight, replaces your old class toggling
+      // optional flash highlight, replaces old class toggling
       el.classList.add('ring-2', 'ring-blue-500', 'ring-offset-2', 'rounded')
       setTimeout(() => {
         el.classList.remove(
@@ -193,12 +193,12 @@ export function CriteriaAnnotationVerificationPage() {
         return (
           <DropdownSection
             key={st}
-            id={`section-${st}`} // keeps your jump bar working
+            id={`section-${st}`} // keeps jump bar working
             name={`${st.replace('_', ' ')} (${list.length})`}
-            isOpen={open[st]} // controlled by your state
+            isOpen={open[st]} // controlled by state
             onToggle={(next) => setOpen((o) => ({ ...o, [st]: next }))}
             backgroundColor="bg-white"
-            headerClassName="top-0" // matches your previous sticky top-0
+            headerClassName="top-0" // matches previous sticky top-0
           >
             {list.map((sc) => (
               <div

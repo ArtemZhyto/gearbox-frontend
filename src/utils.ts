@@ -665,3 +665,23 @@ export function publishMatchForm() {
     buildStudies(),
   ])
 }
+
+export function getOrCreate<K, V>(map: Map<K, V[]>, key: K): V[] {
+  let bucket = map.get(key)
+  if (!bucket) {
+    bucket = []
+    map.set(key, bucket)
+  }
+  return bucket
+}
+
+export const clamp = (n: number, len: number) => Math.max(0, Math.min(len, n))
+
+export function escapeHtml(s: string): string {
+  return s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}

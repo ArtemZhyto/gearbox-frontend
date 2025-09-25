@@ -8,6 +8,7 @@ import {
   StudyVersionAdjudication,
   Criterion,
   CriterionStaging,
+  RawCriterion,
 } from '../model'
 import Field from '../components/Inputs/Field'
 import { CriteriaAnnotationVerification } from '../components/CriteriaAnnotationVerification'
@@ -19,6 +20,10 @@ import { getCriteria } from '../api/criterion'
 import Button from '../components/Inputs/Button'
 import { useManageItemScrollPosition } from '../hooks/useManageItemScrollPosition'
 import DropdownSection from '../components/DropdownSection'
+import { useModal } from '../hooks/useModal'
+import { XCircle, Eye } from 'react-feather'
+import { RawCriterionHighlighter } from '../components/RawCriterionHighlighter'
+import { getRawCriterion } from '../api/rawCriteria'
 
 type Status = CriterionStaging['criterion_adjudication_status']
 const statusOrder: Status[] = ['NEW', 'IN_PROCESS', 'EXISTING', 'ACTIVE']
@@ -37,6 +42,8 @@ export function CriteriaAnnotationVerificationPage() {
   const [values, setValues] = useState<CriteriaValue[]>([])
   const [inputTypes, setInputTypes] = useState<InputType[]>([])
   const [loadingStatus, setLoadingStatus] = useState<ApiStatus>('not started')
+  const [showModal, openModal, closeModal] = useModal()
+  const [rawCriterion, setRawCriterion] = useState<RawCriterion | null>(null)
 
   const {
     topRef,
@@ -96,12 +103,16 @@ export function CriteriaAnnotationVerificationPage() {
 
   const onStudyChanged = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const ebcId = +event.target.value
-    getCriterionStaging(ebcId)
-      .then((sc) => {
+    Promise.all([getCriterionStaging(ebcId), getRawCriterion(ebcId)])
+      .then(([sc, rc]) => {
         setStagingCriteria(sc)
+        setRawCriterion(rc)
         setEligibilityCriteriaId(ebcId)
       })
-      .catch(() => setStagingCriteria([]))
+      .catch(() => {
+        setStagingCriteria([])
+        setRawCriterion(null)
+      })
   }
 
   // Group once, render many
@@ -169,20 +180,49 @@ export function CriteriaAnnotationVerificationPage() {
       />
 
       {/* Jump Bar (uses section ids instead of refs) */}
-      <div className="mt-3 flex flex-wrap gap-2">
-        {statusOrder.map((st) => (
+      <div className="mt-3 top-24 z-40 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-sm rounded-md">
+        <div className="p-2 flex flex-wrap items-center gap-2">
+          {/* left: status chips */}
+          <div className="flex flex-wrap gap-2">
+            {statusOrder.map((st) => (
+              <button
+                key={st}
+                className="px-3 py-1 rounded-full border hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                onClick={() =>
+                  document
+                    .getElementById(`section-${st}`)
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }
+              >
+                {st.replace('_', ' ')} ({counts[st]})
+              </button>
+            ))}
+          </div>
+
+          {/* right: view raw highlighter trigger */}
           <button
-            key={st}
-            className="px-3 py-1 rounded-full border"
-            onClick={() =>
-              document
-                .getElementById(`section-${st}`)
-                ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            type="button"
+            onClick={openModal}
+            disabled={!rawCriterion}
+            aria-controls="match-info-modal"
+            className={[
+              'ml-auto inline-flex items-center gap-1 px-3 py-1 rounded-full',
+              'text-blue-600 hover:underline hover:bg-blue-50',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+              !rawCriterion
+                ? 'opacity-50 cursor-not-allowed pointer-events-none'
+                : 'cursor-pointer',
+            ].join(' ')}
+            title={
+              rawCriterion
+                ? 'Open highlighted raw criterion'
+                : 'Select a study first'
             }
           >
-            {st.replace('_', ' ')} ({counts[st]})
+            <Eye size={16} aria-hidden="true" />
+            View Highlighted Raw Eligibility Criteria
           </button>
-        ))}
+        </div>
       </div>
 
       {/* Grouped sections */}
@@ -191,33 +231,74 @@ export function CriteriaAnnotationVerificationPage() {
         if (!list.length) return null
 
         return (
-          <DropdownSection
-            key={st}
-            id={`section-${st}`} // keeps jump bar working
-            name={`${st.replace('_', ' ')} (${list.length})`}
-            isOpen={open[st]} // controlled by state
-            onToggle={(next) => setOpen((o) => ({ ...o, [st]: next }))}
-            backgroundColor="bg-white"
-            headerClassName="top-0" // matches previous sticky top-0
-          >
-            {list.map((sc) => (
+          <>
+            {showModal && (
               <div
-                key={sc.id}
-                ref={createScrollItemRef(sc.id)}
-                id={`crit-${sc.id}`}
-                className="scroll-mt-24"
+                id="match-info-modal"
+                className="fixed w-screen h-screen left-0 top-0 flex items-center justify-center z-50"
+                style={{ background: '#cccc' }}
+                role="dialog"
+                aria-labelledby="eligibility-criteria-dialog-title"
+                aria-modal="true"
               >
-                <CriteriaAnnotationVerification
-                  stagingCriterion={sc}
-                  criteria={criteria}
-                  lookupValues={values}
-                  inputTypes={inputTypes}
-                  setLookupValues={setValues}
-                  onStagingUpdated={handleStagingUpdated}
-                />
+                <div
+                  className="bg-white overflow-scroll w-full lg:w-3/4 xl:w-2/3 h-full"
+                  style={{ maxHeight: '95%', maxWidth: '95%' }}
+                >
+                  <div className="text-sm sm:text-base px-4 pb-4 pt-2 sm:px-8 sm:pb-8">
+                    <div className="flex items-baseline justify-between border-b py-2 sm:py-4 mb-4 sticky top-0 bg-white">
+                      <h3
+                        id="eligibility-criteria-dialog-title"
+                        className="font-bold mr-4"
+                      >
+                        <span className="text-gray-500 text-sm">
+                          Highlighted Annotation for Raw Eligibility Criteria
+                        </span>
+                        <span className="italic block">
+                          {rawCriterion?.nct || ''}
+                        </span>
+                      </h3>
+                      <button
+                        className="ml-2 hover:text-red-700"
+                        onClick={closeModal}
+                        aria-label="Close Trial Match Info dialog"
+                      >
+                        <XCircle className="inline" />
+                      </button>
+                    </div>
+                    <RawCriterionHighlighter rawCriterion={rawCriterion} />
+                  </div>
+                </div>
               </div>
-            ))}
-          </DropdownSection>
+            )}
+            <DropdownSection
+              key={st}
+              id={`section-${st}`} // keeps jump bar working
+              name={`${st.replace('_', ' ')} (${list.length})`}
+              isOpen={open[st]} // controlled by state
+              onToggle={(next) => setOpen((o) => ({ ...o, [st]: next }))}
+              backgroundColor="bg-white"
+              headerClassName="top-0" // matches previous sticky top-0
+            >
+              {list.map((sc) => (
+                <div
+                  key={sc.id}
+                  ref={createScrollItemRef(sc.id)}
+                  id={`crit-${sc.id}`}
+                  className="scroll-mt-24"
+                >
+                  <CriteriaAnnotationVerification
+                    stagingCriterion={sc}
+                    criteria={criteria}
+                    lookupValues={values}
+                    inputTypes={inputTypes}
+                    setLookupValues={setValues}
+                    onStagingUpdated={handleStagingUpdated}
+                  />
+                </div>
+              ))}
+            </DropdownSection>
+          </>
         )
       })}
     </div>

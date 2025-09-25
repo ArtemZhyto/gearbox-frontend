@@ -279,3 +279,38 @@ export type Unit = {
   id: number
   name: string
 }
+
+export type PreAnnotatedItem = {
+  span: [number, number, string]
+  matched_models: string[]
+  is_standard_gb_var: boolean
+}
+
+export type EntityItem = {
+  id: number
+  label: string
+  start_offset: number
+  end_offset: number
+  meta: unknown
+}
+
+export type AnnotationSource = 'entity' | 'pre'
+export type RawCriterion = {
+  text: string
+  id: number
+  uuid: string | null
+  nct: string | null
+  pre_annotated: PreAnnotatedItem[]
+  entities: EntityItem[]
+
+  // Present in your payload; keep them typed so parsing is lossless
+  Comments: unknown[]
+  relations: unknown[]
+}
+
+export type HighlightSpan = {
+  start: number
+  end: number
+  label?: string
+  source: AnnotationSource
+}

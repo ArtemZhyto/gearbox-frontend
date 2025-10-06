@@ -62,7 +62,6 @@ function TrialMatchInfo({ study, studyMatchInfo }: TrialMatchInfoProps) {
           >
             <div className="text-sm sm:text-base px-4 pb-4 pt-2 sm:px-8 sm:pb-8">
               <div className="flex items-baseline justify-between border-b py-2 sm:py-4 mb-4 sticky top-0 bg-white">
-                {/* Header */}
                 <h3
                   id="eligibility-criteria-dialog-title"
                   className="font-bold mr-4"
@@ -71,10 +70,9 @@ function TrialMatchInfo({ study, studyMatchInfo }: TrialMatchInfoProps) {
                     Eligibility Criteria for{' '}
                   </span>
                   <span className="italic block">
-                    {`Clinical Trial Participation Criteria for Study ${study.code}`}
+                    {study.code}: {study.name}
                   </span>
                 </h3>
-                {/* Modal options toggle - begin */}
                 <div className="min-w-max">
                   <div
                     className="inline relative font-normal normal-case text-base"
@@ -177,7 +175,6 @@ function TrialMatchInfo({ study, studyMatchInfo }: TrialMatchInfoProps) {
                     <XCircle className="inline" />
                   </button>
                 </div>
-                {/* Modal options toggle - end */}
               </div>
               <MatchInfoDetails
                 isFilterActive={isFilterActive}

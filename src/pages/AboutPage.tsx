@@ -56,10 +56,8 @@ function AboutPage() {
         </p>
         <p>
           GEARBOx is developed by the University of Chicago’s Data for the
-          Common Good (D4CG) team with funding from the{' '}
-          <span className="font-bold">Leukemia & Lymphoma Society</span> (LLS)
-          as part of PedAL: Precision Medicine for Pediatric Acute Leukemia
-          initiative,{' '}
+          Common Good (D4CG) team with funding from the {' '}
+          <span className="font-bold">Pediatric Acute Leukemia Master Clinical Trial (Blood Cancer United PedAL)</span>, {' '}
           <span className="font-bold">
             The Fund for Innovation in Cancer Informatics
           </span>{' '}
@@ -121,9 +119,9 @@ function AboutPage() {
           <li>
             <LinkExternal
               className="underline text-primary"
-              to="https://www.lls.org/childrens-initiative/pedal"
+              to="https://bloodcancerunited.org/about-us/dare-to-dream-project/pedal"
             >
-              LLS Pedal Initiative
+              Pediatric Acute Leukemia Master Clinical Trial (Blood Cancer United PedAL)
             </LinkExternal>
           </li>
           <li>

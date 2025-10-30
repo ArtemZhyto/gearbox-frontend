@@ -18,13 +18,9 @@ export type Study = {
 export type StudyVersion = {
   id: number
   study_version: number
-  eligibility_criteria_infos: [
-    {
-      study_algorithm_engine_id: number | null
-      eligibility_criteria_id: number
-      status: StudyVersionStatus
-    }
-  ]
+  status: StudyVersionStatus
+  eligibility_criteria_id: number
+  study_algorithm_engine_id: number | null
   study: Study
 }
 
@@ -51,12 +47,24 @@ export type MatchCondition = {
 
 export type StudyAlgorithmEngine = {
   id: number
+  study_version_id: number
   algorithm_logic: MatchAlgorithm
 }
 
 export type MatchFormGroupConfig = {
   id: number
   name: string
+}
+
+//Add
+export type ImportantQuestionGroupConfig = {
+  id: number
+  name: string
+}
+
+//Add
+export type ImportantQuestionConfig = {
+  groups: ImportantQuestionGroupConfig[]
 }
 
 export type MatchFormFieldOption = {
@@ -185,16 +193,124 @@ export type UserInputUi = {
   name?: string
 }
 
-export type EligibilityCriteriaInfo = {
+export type ElCriteriaHasCriterion = {
+  criterion_id: number | null
+  eligibility_criteria_id: number
   create_date?: string
-  status: StudyVersionStatus
-  study_version_id?: number
-  study_algorithm_engine_id?: number
-  eligibility_criteria_id?: number
-  id?: number
+  active: boolean
+}
+
+export type StagingElCriteriaHasCriterion = ElCriteriaHasCriterion & {
+  criterion_staging_id: number
+  value_ids: number[]
+}
+
+export type InputType = {
+  id: number
+  data_type: 'Integer' | 'list' | 'percentage' | 'Float' | 'integer'
+  render_type: 'number' | 'radio' | 'select' | 'age'
+}
+
+export type StudyVersionAdjudication = {
+  study_id: number
+  study_version_num: number
+  id: number
+  active: boolean
+  eligibility_criteria_id: number
+  study_algorithm_engine_id: number
+  study: Study
+}
+
+export type Criterion = {
+  id: number
+  code: string
+  description: string
+  display_name: string
+  input_type_id: number
+  values: CriteriaValue[]
+}
+
+export type CriterionStaging = {
+  code: string
+  criterion_adjudication_status: 'NEW' | 'EXISTING' | 'ACTIVE' | 'IN_PROCESS'
+  criterion_id: number | null
+  description: string
+  display_name: string
+  echc_adjudication_status: 'NEW' | 'EXISTING' | 'ACTIVE'
+  eligibility_criteria_id: number
+  id: number
+  text: string
+  input_id: number
+  input_type_id: number
+  echc_value_ids: number[] | null
+}
+
+export type CriteriaValue = {
+  id: number
+  description: string | null
+  is_numeric: boolean
+  active: boolean
+  value_string: string | null
+  operator: ComparisonOperator | null
+  unit_name: string | null
+  unit_id: number
+}
+
+export type CriterionStagingWithValues = CriterionStaging & {
+  criterion_value_ids: number[]
+}
+
+export type CriterionStagingWithValueList = CriterionStaging & {
+  criterion_value_list: CriteriaValue[] | null
+}
+
+export type CriterionStagingPublish = {
+  code: string
+  display_name: string
+  description: string
+  active: boolean
+  ontology_code_id?: number | null
+  input_type_id: number
+  criterion_staging_id: number
+  values: number[]
 }
 
 export type Unit = {
   id: number
   name: string
+}
+
+export type PreAnnotatedItem = {
+  span: [number, number, string]
+  matched_models: string[]
+  is_standard_gb_var: boolean
+}
+
+export type EntityItem = {
+  id: number
+  label: string
+  start_offset: number
+  end_offset: number
+  meta: unknown
+}
+
+export type AnnotationSource = 'entity' | 'pre'
+export type RawCriterion = {
+  text: string
+  id: number
+  uuid: string | null
+  nct: string | null
+  pre_annotated: PreAnnotatedItem[] | null
+  entities: EntityItem[] | null
+
+  // Present in your payload; keep them typed so parsing is lossless
+  Comments: unknown[]
+  relations: unknown[]
+}
+
+export type HighlightSpan = {
+  start: number
+  end: number
+  label?: string
+  source: AnnotationSource
 }

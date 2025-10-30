@@ -1,4 +1,7 @@
-import { MultiSelect as ReactMultiSelect } from 'react-multi-select-component'
+import {
+  MultiSelect as ReactMultiSelect,
+  SelectProps,
+} from 'react-multi-select-component'
 import type { MatchFormFieldOption } from '../../model'
 
 type MultiSelectProps = {
@@ -6,49 +9,52 @@ type MultiSelectProps = {
   name?: string
   options: MatchFormFieldOption[]
   disabled?: boolean
-  placeholder?: string
-  value?: any[]
+  value?: MatchFormFieldOption[]
   onChange?(event: any): void
-}
-
-function reshapeToMulti(options: MatchFormFieldOption[], value?: any[]) {
-  return value === undefined
-    ? options.map(({ label, value }) => ({ label, value }))
-    : options.filter((option) => value.includes(option.value))
+  onCreateOption?(label: string): void
+  isCreatable?: boolean
+  isLoading?: boolean
+  hasSelectAll?: boolean
+  closeOnChangedValue?: boolean
+  className?: string
 }
 
 function MultiSelect({
   label,
   name,
   options,
-  placeholder,
   value = [],
-  onChange,
+  disabled,
+  isCreatable = true,
+  isLoading = false,
+  hasSelectAll = true,
+  closeOnChangedValue = false,
+  className = '',
   ...attrs
 }: MultiSelectProps) {
-  const multiOptions = reshapeToMulti(options)
-  function handleChange(selected: MatchFormFieldOption[]) {
-    if (onChange && name)
-      onChange({ target: { name, value: selected.map(({ value }) => value) } })
+  const baseClassName = 'flex flex-col'
+  const multiSelectAttrs: SelectProps = {
+    ...attrs,
+    disabled,
+    labelledBy: name || '',
+    value,
+    options,
+    isCreatable,
+    isLoading,
+    hasSelectAll,
+    closeOnChangedValue,
+    className,
   }
 
   return (
-    <ReactMultiSelect
-      {...attrs}
-      options={multiOptions}
-      value={reshapeToMulti(options, value)}
-      onChange={handleChange}
-      filterOptions={(options, filter) =>
-        filter
-          ? options.filter(
-              ({ label }) => label && label.match(new RegExp(filter, 'i'))
-            )
-          : options
-      }
-      hasSelectAll={false}
-      labelledBy={label || ''}
-      overrideStrings={{ selectSomeItems: placeholder || '' }}
-    />
+    <div className={`${baseClassName} ${className}`}>
+      {label && (
+        <label className="mb-1" htmlFor={name}>
+          {label}
+        </label>
+      )}
+      <ReactMultiSelect {...multiSelectAttrs} />
+    </div>
   )
 }
 

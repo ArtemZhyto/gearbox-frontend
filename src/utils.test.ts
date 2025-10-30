@@ -1,26 +1,30 @@
 import type {
+  Criterion,
   EligibilityCriterion,
   MatchAlgorithm,
   MatchCondition,
-  MatchFormValues,
   MatchFormConfig,
   MatchFormFieldShowIfCondition,
-  MatchInfoAlgorithm,
+  MatchFormValues,
   MatchInfo,
+  MatchInfoAlgorithm,
   Study,
 } from './model'
+import { MatchFormFieldConfig } from './model'
 import {
   addMatchStatus,
-  getIsFieldShowing,
+  clamp,
+  escapeHtml,
   getFieldOptionLabelMap,
-  getUniqueCritIdsInAlgorithm,
-  markRelevantMatchFields,
+  getIsFieldShowing,
+  getOrCreate,
   getQueryBuilderConfig,
   getQueryBuilderValue,
-  queryBuilderValueToAlgorithm,
   getShowIfDetails,
+  getUniqueCritIdsInAlgorithm,
+  markRelevantMatchFields,
+  queryBuilderValueToAlgorithm,
 } from './utils'
-import { MatchFormFieldConfig } from './model'
 import {
   Fields,
   JsonGroup,
@@ -678,7 +682,7 @@ describe('getQueryBuilderConfig', () => {
       },
     ]
 
-    const criteria: EligibilityCriterion[] = [
+    const eligibilityCriteria: EligibilityCriterion[] = [
       {
         id: 1,
         fieldId: 1,
@@ -690,6 +694,62 @@ describe('getQueryBuilderConfig', () => {
         fieldId: 2,
         fieldValue: 1,
         operator: 'eq',
+      },
+      {
+        id: 3,
+        fieldId: 218,
+        fieldValue: 5,
+        operator: 'eq',
+      },
+    ]
+
+    const criteriaNotInMatchForm: Criterion[] = [
+      {
+        code: 'karnofsky_score',
+        display_name: 'Test',
+        description: 'description',
+        input_type_id: 2,
+        id: 218,
+        values: [
+          {
+            id: 5,
+            is_numeric: false,
+            active: true,
+            description: 'Not sure',
+            value_string: 'Not sure',
+            unit_name: null,
+            unit_id: 0,
+            operator: 'eq',
+          },
+          {
+            id: 4,
+            is_numeric: false,
+            active: true,
+            description: 'is false',
+            value_string: 'No',
+            unit_name: null,
+            operator: 'eq',
+            unit_id: 0,
+          },
+          {
+            id: 3,
+            is_numeric: false,
+            active: true,
+            description: 'is true',
+            value_string: 'Yes',
+            unit_name: null,
+            operator: 'eq',
+            unit_id: 0,
+          },
+        ],
+      },
+      {
+        code: 'test_code',
+        display_name: 'aaa',
+        description: 'vvv',
+        input_type_id: 1,
+        id: 210,
+        values: [],
       },
     ]
     const expectedFields: Fields = {
@@ -715,8 +775,34 @@ describe('getQueryBuilderConfig', () => {
           ],
         },
       },
+      '3': {
+        label: 'karnofsky_score == Not sure [ Warning: Not in Match Form ]',
+        type: 'select',
+        defaultValue: 5,
+        defaultOperator: 'select_equals',
+        fieldSettings: {
+          listValues: [
+            {
+              title: 'Not sure',
+              value: 5,
+            },
+            {
+              title: 'No',
+              value: 4,
+            },
+            {
+              title: 'Yes',
+              value: 3,
+            },
+          ],
+        },
+      },
     }
-    const queryBuilderConfig = getQueryBuilderConfig(matchFormFields, criteria)
+    const queryBuilderConfig = getQueryBuilderConfig(
+      matchFormFields,
+      eligibilityCriteria,
+      criteriaNotInMatchForm
+    )
     const { immutableValuesMode, immutableOpsMode } =
       queryBuilderConfig.settings
     expect(queryBuilderConfig.fields).toEqual(expectedFields)
@@ -866,11 +952,11 @@ describe('getQueryBuilderValue', () => {
       type: 'group',
     }
     expect(
-      getQueryBuilderValue(undefined, [], { groups: [], fields: [] })
+      getQueryBuilderValue(undefined, [], { groups: [], fields: [] }, [])
     ).toEqual(expected)
-    expect(getQueryBuilderValue(null, [], { groups: [], fields: [] })).toEqual(
-      expected
-    )
+    expect(
+      getQueryBuilderValue(null, [], { groups: [], fields: [] }, [])
+    ).toEqual(expected)
   })
 
   test('when algorithm is not undefined or null', () => {
@@ -962,8 +1048,14 @@ describe('getQueryBuilderValue', () => {
       ],
     }
 
+    const criteriaNotInMatchForm: Criterion[] = []
     expect(
-      getQueryBuilderValue(algorithm, eligibilityCriteria, matchForm)
+      getQueryBuilderValue(
+        algorithm,
+        eligibilityCriteria,
+        matchForm,
+        criteriaNotInMatchForm
+      )
     ).toEqual(jsonGroup)
   })
 })
@@ -1065,5 +1157,161 @@ describe('getShowIfDetails', () => {
         },
       ],
     })
+  })
+})
+
+describe('getOrCreate', () => {
+  test('creates a new bucket when key is absent and stores it in the map', () => {
+    const m = new Map<string, number[]>()
+    const bucket = getOrCreate(m, 'a')
+
+    expect(Array.isArray(bucket)).toBe(true)
+    expect(bucket).toHaveLength(0)
+    expect(m.has('a')).toBe(true)
+    expect(m.get('a')).toBe(bucket) // same reference
+  })
+
+  test('returns the existing bucket when key is present (same reference)', () => {
+    const m = new Map<string, number[]>()
+    const first = getOrCreate(m, 'k')
+    first.push(1, 2)
+
+    const second = getOrCreate(m, 'k')
+    expect(second).toBe(first)
+    expect(second).toEqual([1, 2])
+  })
+
+  test('mutations on returned bucket are reflected in the map', () => {
+    const m = new Map<string, string[]>()
+    const bucket = getOrCreate(m, 'users')
+    bucket.push('alice')
+
+    expect(m.get('users')).toEqual(['alice'])
+    // push again through a fresh call
+    getOrCreate(m, 'users').push('bob')
+    expect(m.get('users')).toEqual(['alice', 'bob'])
+  })
+
+  test('different keys get different buckets', () => {
+    const m = new Map<string, number[]>()
+    const a = getOrCreate(m, 'a')
+    const b = getOrCreate(m, 'b')
+
+    expect(a).not.toBe(b)
+    a.push(1)
+    b.push(2)
+    expect(m.get('a')).toEqual([1])
+    expect(m.get('b')).toEqual([2])
+  })
+
+  test('works with non-primitive keys (object identity)', () => {
+    const key1 = { id: 1 }
+    const key2 = { id: 1 } // different object
+    const m = new Map<object, string[]>()
+
+    const b1 = getOrCreate(m, key1)
+    const b2 = getOrCreate(m, key2)
+
+    expect(b1).not.toBe(b2)
+    b1.push('x')
+    b2.push('y')
+    expect(m.get(key1)).toEqual(['x'])
+    expect(m.get(key2)).toEqual(['y'])
+  })
+
+  test('does not recreate when bucket is an empty array (truthy)', () => {
+    const m = new Map<string, number[]>()
+    const first = getOrCreate(m, 'z')
+    const second = getOrCreate(m, 'z')
+    expect(second).toBe(first)
+  })
+})
+
+describe('clamp', () => {
+  test('returns n when within [0, len]', () => {
+    expect(clamp(5, 10)).toBe(5)
+    expect(clamp(0, 10)).toBe(0)
+    expect(clamp(10, 10)).toBe(10)
+  })
+
+  test('clamps negative values to 0', () => {
+    expect(clamp(-1, 10)).toBe(0)
+    expect(clamp(-100, 10)).toBe(0)
+  })
+
+  test('clamps values > len to len', () => {
+    expect(clamp(11, 10)).toBe(10)
+    expect(clamp(1e6, 10)).toBe(10)
+  })
+
+  test('handles decimals without rounding', () => {
+    expect(clamp(3.7, 10)).toBeCloseTo(3.7)
+    expect(clamp(10.2, 10)).toBe(10)
+    expect(clamp(-0.4, 10)).toBe(0)
+  })
+
+  test('len = 0 always clamps to 0 (for finite n)', () => {
+    expect(clamp(-5, 0)).toBe(0)
+    expect(clamp(0, 0)).toBe(0)
+    expect(clamp(5, 0)).toBe(0)
+  })
+
+  test('negative len results in 0 (given the formula)', () => {
+    // Math.min(len, n) <= len < 0, then Math.max(0, ...) => 0
+    expect(clamp(5, -10)).toBe(0)
+    expect(clamp(-5, -10)).toBe(0)
+  })
+
+  test('handles Infinity and -Infinity', () => {
+    expect(clamp(Infinity, 10)).toBe(10)
+    expect(clamp(-Infinity, 10)).toBe(0)
+  })
+
+  test('NaN inputs propagate to NaN', () => {
+    expect(Number.isNaN(clamp(NaN as unknown as number, 10))).toBe(true)
+    expect(Number.isNaN(clamp(5, NaN as unknown as number))).toBe(true)
+  })
+})
+
+describe('escapeHtml', () => {
+  test('escapes each special character', () => {
+    expect(escapeHtml('&')).toBe('&amp;')
+    expect(escapeHtml('<')).toBe('&lt;')
+    expect(escapeHtml('>')).toBe('&gt;')
+    expect(escapeHtml('"')).toBe('&quot;')
+    expect(escapeHtml("'")).toBe('&#39;')
+  })
+
+  test('returns the same text when there are no special characters', () => {
+    const s = 'Hello world 123 😀'
+    expect(escapeHtml(s)).toBe(s)
+  })
+
+  test('escapes a mixed string with all characters', () => {
+    const s = `<script>alert('x' & "y")</script>`
+    const expected = `&lt;script&gt;alert(&#39;x&#39; &amp; &quot;y&quot;)&lt;/script&gt;`
+    expect(escapeHtml(s)).toBe(expected)
+  })
+
+  test('order: newly inserted ampersands are not double-escaped', () => {
+    // Because '&' is replaced first, the '&' that appears in '&lt;' should NOT be escaped again.
+    expect(escapeHtml('<')).toBe('&lt;')
+    expect(escapeHtml('>')).toBe('&gt;')
+    expect(escapeHtml('"')).toBe('&quot;')
+    expect(escapeHtml("'")).toBe('&#39;')
+  })
+
+  test('already-escaped sequences get their ampersands escaped (as expected for raw escaping)', () => {
+    const s = '&lt;already&gt; &amp; &quot;quoted&quot; &#39;single&#39;'
+    const expected =
+      '&amp;lt;already&amp;gt; &amp;amp; &amp;quot;quoted&amp;quot; &amp;#39;single&amp;#39;'
+    expect(escapeHtml(s)).toBe(expected)
+  })
+
+  test('handles long strings and preserves non-ASCII characters', () => {
+    const s = '5 < 6 & 7 > 3 — "quote" and \'single\' ©'
+    const expected =
+      '5 &lt; 6 &amp; 7 &gt; 3 — &quot;quote&quot; and &#39;single&#39; ©'
+    expect(escapeHtml(s)).toBe(expected)
   })
 })

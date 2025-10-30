@@ -105,7 +105,6 @@ function LandingPageSection4({ isLLS }: { isLLS: boolean }) {
                 alt="Blood Cancer United"
                 className="h-28 w-auto object-contain"
               />
-
               {!isLLS && (
                 <>
                   <a

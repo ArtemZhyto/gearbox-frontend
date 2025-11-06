@@ -29,3 +29,9 @@ export function updateStudyVersion(studyVersion: StudyVersion) {
     body: JSON.stringify(studyVersion),
   })
 }
+
+export function publishStudyVersion(studyVersionId: number) {
+  return fetchGearbox(`/gearbox/publish-study-version/${studyVersionId}`, {
+    method: 'POST',
+  })
+}

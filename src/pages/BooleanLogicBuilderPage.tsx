@@ -8,7 +8,6 @@ import 'react-tabs/style/react-tabs.css'
 import { Criterion, StudyVersionStatus } from '../model'
 import { useStudyVersions } from '../hooks/useStudyVersions'
 import { ErrorRetry } from '../components/ErrorRetry'
-import { PublishMatchForm } from '../components/PublishMatchForm'
 import { getCriteriaNotExistInMatchForm } from '../api/criterion'
 
 type TabType = {
@@ -61,7 +60,6 @@ export function BooleanLogicBuilderPage({
             <ErrorRetry retry={fetchStudyVersion} />
           ) : (
             <>
-              <PublishMatchForm />
               {studyVersions.map((sv) => (
                 <TrialCard study={sv.study} key={sv.id}>
                   <BooleanLogicBuilder

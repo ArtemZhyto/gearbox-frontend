@@ -6,7 +6,7 @@ import { Criterion, StudyVersion } from '../model'
 import { useModal } from '../hooks/useModal'
 import { CriteriaBuilderModal } from './CriteriaBuilderModal'
 import Button from './Inputs/Button'
-import { updateStudyVersion } from '../api/studyVersions'
+import { publishStudyVersion, updateStudyVersion } from '../api/studyVersions'
 
 export function BooleanLogicBuilder({
   gearboxState,
@@ -28,18 +28,32 @@ export function BooleanLogicBuilder({
 
   const [updated, setUpdated] = useState(false)
 
-  const isActive = status === 'ACTIVE'
   const changeStudyStatus = () => {
-    return updateStudyVersion({
-      ...studyVersion,
-      status: isActive ? 'IN_PROCESS' : 'ACTIVE',
-    })
-      .then(() =>
-        setStudyVersions(
-          studyVersions.filter((sv) => sv.id !== studyVersion.id)
-        )
-      )
-      .catch(console.error)
+    if (status === 'IN_PROCESS') {
+      return publishStudyVersion(studyVersion.id)
+        .then(() => {
+          setStudyVersions(
+            studyVersions.filter((sv) => sv.id !== studyVersion.id)
+          )
+          setUpdated(true)
+        })
+        .catch(console.error)
+    }
+
+    if (status === 'ACTIVE') {
+      const payload: StudyVersion = {
+        ...studyVersion,
+        status: 'IN_PROCESS',
+      }
+      return updateStudyVersion(payload)
+        .then(() => {
+          setStudyVersions(
+            studyVersions.filter((sv) => sv.id !== studyVersion.id)
+          )
+          setUpdated(true)
+        })
+        .catch(console.error)
+    }
   }
 
   return (
@@ -52,7 +66,7 @@ export function BooleanLogicBuilder({
           </h2>
         )}
         <Button onClick={changeStudyStatus}>
-          {status === 'ACTIVE' ? 'Mark as In Progress' : 'Confirm'}
+          {status === 'ACTIVE' ? 'Mark as In Progress' : 'Publish'}
         </Button>
         <button
           className={`mr-2 ml-4 ${

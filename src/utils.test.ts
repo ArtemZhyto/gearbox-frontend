@@ -37,6 +37,8 @@ const studies: Study[] = [
     name: 'Study 0',
     code: 'S0000',
     sites: [],
+    create_date: null,
+    active: true,
     links: [
       {
         name: 'ClinicalTrials.gov',
@@ -50,6 +52,8 @@ const studies: Study[] = [
     id: 1,
     name: 'Study 1',
     follow_up_info: '',
+    create_date: null,
+    active: true,
     code: 'S0001',
     sites: [],
     links: [
@@ -65,6 +69,8 @@ const studies: Study[] = [
     name: 'Study 2',
     follow_up_info: '',
     code: 'S0002',
+    create_date: null,
+    active: true,
     sites: [],
     links: [
       {

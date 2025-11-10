@@ -79,15 +79,8 @@ function TrialCard({ study, children }: TrialCardProps) {
             </ul>
             {study.sites.length > 5 && (
               <p className="mt-2 text-sm text-gray-600">
-                To see the full list of active sites, please go visit{' '}
-                <a
-                  href="https://clinicaltrials.gov/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-700 underline"
-                >
-                  https://clinicaltrials.gov/
-                </a>
+                To see the full list of active sites, please click on the link
+                below.
               </p>
             )}
           </div>

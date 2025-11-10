@@ -11,15 +11,17 @@ export function getStudies() {
     .then((res) => res.json())
     .then(fetch)
     .then((res) => res.json() as Promise<{ version: string; studies: Study[] }>)
-    .then((res) => res.studies)
-    .then((studies) =>
-      studies.map(
-        (study) =>
-          ({
-            ...study,
-            sites: study.sites.filter((site) => site.active),
-          } as Study)
-      )
+    .then((res) =>
+      res.studies.map((s) => ({
+        ...s,
+        sites: [...s.sites].sort((a, b) => {
+          const nameA = a.name?.toLowerCase() ?? ''
+          const nameB = b.name?.toLowerCase() ?? ''
+          if (nameA < nameB) return -1
+          if (nameA > nameB) return 1
+          return 0
+        }),
+      }))
     )
     .then((data) => {
       writeCache(SESSION_STORAGE_KEY, JSON.stringify(data))

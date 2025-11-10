@@ -66,12 +66,30 @@ function TrialCard({ study, children }: TrialCardProps) {
           <div className={styles.field.container}>
             <h3 className={styles.field.title}>
               {study.sites.length > 1 ? 'Locations' : 'Location'}
+              {study.sites.length > 5 && (
+                <span className="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
+                  +{study.sites.length - 5} more
+                </span>
+              )}
             </h3>
             <ul className="list-disc ml-8">
-              {study.sites.map((site) => (
+              {study.sites.slice(0, 5).map((site) => (
                 <li key={site.id}>{site.name}</li>
               ))}
             </ul>
+            {study.sites.length > 5 && (
+              <p className="mt-2 text-sm text-gray-600">
+                To see the full list of active sites, please go visit{' '}
+                <a
+                  href="https://clinicaltrials.gov/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-700 underline"
+                >
+                  https://clinicaltrials.gov/
+                </a>
+              </p>
+            )}
           </div>
         ) : null}
         {study.links?.length > 0 ? (

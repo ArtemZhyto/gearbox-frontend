@@ -1,14 +1,22 @@
 export type ApiStatus = 'not started' | 'sending' | 'success' | 'error'
 type Site = {
-  id: number
-  active: boolean
   name: string
+  country: string | null
+  city: strin | null
+  state: string | null
+  zip: string | null
+  create_date: string | null
+  location_lat: string | null
+  location_long: string | null
+  id: number
 }
 
 export type Study = {
   id: number
   code: string
   name: string
+  create_date: string | null
+  active: boolean
   description: string
   links: { name: string; href: string }[]
   sites: Site[]

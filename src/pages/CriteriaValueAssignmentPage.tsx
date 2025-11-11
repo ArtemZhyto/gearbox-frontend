@@ -106,6 +106,7 @@ export function CriteriaValueAssignmentPage() {
               numericValues={numericValues}
               setNumericValues={setNumericValues}
               units={units}
+              setUnits={setUnits}
             />
           ))
       ) : (

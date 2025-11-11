@@ -5,6 +5,7 @@ import {
   MatchFormFieldOption,
   CriterionStaging,
   CriterionStagingWithValueList,
+  Criterion,
 } from '../model'
 import Field from './Inputs/Field'
 import Button from './Inputs/Button'
@@ -17,40 +18,53 @@ import {
   saveCriterionStaging,
 } from '../api/criterionStaging'
 
+type Status = CriterionStaging['criterion_adjudication_status']
+
 export function CriteriaAnnotationVerification({
-  stagingCriterion,
+  stagingCriterion: initialStagingCriterion,
+  criteria,
   lookupValues,
   inputTypes,
   setLookupValues,
+  onStagingUpdated,
 }: {
   stagingCriterion: CriterionStagingWithValueList
+  criteria: Criterion[]
   lookupValues: CriteriaValue[]
   inputTypes: InputType[]
   setLookupValues: React.Dispatch<React.SetStateAction<CriteriaValue[]>>
+  onStagingUpdated: (updated: CriterionStagingWithValueList) => void
 }) {
   const checkIsList = (id: number): boolean => {
     return (
       inputTypes.find((inputType) => inputType.id === id)?.data_type === 'list'
     )
   }
-
-  const [status, setStatus] = useState<
-    CriterionStaging['criterion_adjudication_status']
-  >(stagingCriterion.criterion_adjudication_status)
+  const [stagingCriterion, setStagingCriterion] =
+    useState<CriterionStagingWithValueList>(initialStagingCriterion)
+  const [existingCriterion, setExistingCriterion] = useState<
+    Criterion | undefined
+  >(
+    stagingCriterion.criterion_adjudication_status === 'EXISTING'
+      ? criteria.find((c) => c.code === stagingCriterion.code)
+      : undefined
+  )
+  const status: Status =
+    stagingCriterion.criterion_adjudication_status === 'ACTIVE'
+      ? 'ACTIVE'
+      : existingCriterion
+      ? 'EXISTING'
+      : stagingCriterion.criterion_adjudication_status
 
   const isEditable = status === 'NEW' || status === 'IN_PROCESS'
+  const isCodeEditable = status !== 'ACTIVE'
 
-  const [selectedValues, setSelectedValues] = useState<MatchFormFieldOption[]>(
-    stagingCriterion.criterion_value_list?.map((v) => ({
-      value: v.id,
-      label: v.value_string || '',
-    })) || []
-  )
-  const [selectedInputTypeId, setSelectedInputTypeId] = useState<number>(
-    stagingCriterion.input_type_id || 0
-  )
   const [isList, setIsList] = useState<boolean>(
-    checkIsList(stagingCriterion.input_type_id)
+    checkIsList(
+      existingCriterion
+        ? existingCriterion.input_type_id
+        : stagingCriterion.input_type_id
+    )
   )
   const [isCreating, setIsCreating] = useState<boolean>(false)
   const formRef = useRef<HTMLFormElement>(null)
@@ -72,7 +86,6 @@ export function CriteriaAnnotationVerification({
       return
     }
     const formData = new FormData(formRef.current)
-    const code = formData.get('code')?.toString() || ''
     const displayName = formData.get('displayName')?.toString() || ''
     const description = formData.get('description')?.toString() || ''
 
@@ -81,18 +94,22 @@ export function CriteriaAnnotationVerification({
     setApiStatus('sending')
     saveCriterionStaging({
       ...updatedCriterionStaging,
-      code,
       display_name: displayName,
       description,
-      input_type_id: selectedInputTypeId,
       criterion_id: null,
-      criterion_value_ids: selectedValues.map((v) => v.value),
+      criterion_value_ids:
+        stagingCriterion.criterion_value_list?.map((v) => v.id) || [],
     })
-      .then(() => {
-        console.log('here')
+      .then(({ criterion_value_ids, ...rest }) => {
         setApiStatus('success')
-        setStatus('IN_PROCESS')
         setCanPublish(true)
+        const idSet = new Set(criterion_value_ids)
+        const updated: CriterionStagingWithValueList = {
+          ...rest,
+          criterion_value_list: lookupValues.filter((v) => idSet.has(v.id)),
+        }
+        setStagingCriterion(updated)
+        onStagingUpdated(updated)
       })
       .catch((err) => {
         console.error(err)
@@ -118,23 +135,30 @@ export function CriteriaAnnotationVerification({
       )
     ) {
       const formData = new FormData(formRef.current)
-      const code = formData.get('code')?.toString() || ''
       const displayName = formData.get('displayName')?.toString() || ''
       const description = formData.get('description')?.toString() || ''
 
       setApiStatus('sending')
       publishCriterionStaging({
-        code,
+        code: stagingCriterion.code,
         active: true,
         display_name: displayName,
         description,
-        values: selectedValues.map((v) => v.value),
+        values: stagingCriterion.criterion_value_list?.map((v) => v.id) || [],
         criterion_staging_id: stagingCriterion.id,
-        input_type_id: selectedInputTypeId,
+        input_type_id: stagingCriterion.input_type_id,
       })
         .then(() => {
           setApiStatus('success')
-          setStatus('ACTIVE')
+          // Use functional set to build the exact object we store + send up
+          setStagingCriterion((prev) => {
+            const updated: CriterionStagingWithValueList = {
+              ...prev,
+              criterion_adjudication_status: 'ACTIVE',
+            }
+            onStagingUpdated?.(updated)
+            return updated
+          })
         })
         .catch((err) => {
           setErrorMsg(err.message)
@@ -150,19 +174,68 @@ export function CriteriaAnnotationVerification({
     }
   }
 
-  const edit = () => setStatus('IN_PROCESS')
-
   const accept = () => {
     if (
       confirm(
         'Accepting the staging criterion will finalized the changes and can not be reverted. Are you sure to accept?'
       )
     ) {
+      if (!existingCriterion) {
+        return
+      }
+      const {
+        id,
+        eligibility_criteria_id,
+        echc_adjudication_status,
+        criterion_adjudication_status,
+        text,
+        input_id,
+        echc_value_ids,
+      } = stagingCriterion
+
+      const {
+        code,
+        id: criterion_id,
+        display_name,
+        description,
+        values,
+        input_type_id,
+      } = existingCriterion
+
       setApiStatus('sending')
-      acceptCriterionStaging(stagingCriterion.id)
+      saveCriterionStaging({
+        id,
+        code,
+        criterion_adjudication_status,
+        criterion_id,
+        description,
+        display_name,
+        echc_adjudication_status,
+        eligibility_criteria_id,
+        text,
+        input_id,
+        input_type_id,
+        echc_value_ids,
+        criterion_value_ids: values.map((v) => v.id),
+      })
+        .then(() => acceptCriterionStaging(id))
         .then(() => {
           setApiStatus('success')
-          setStatus('ACTIVE')
+          setStagingCriterion((prev) => {
+            const updated: CriterionStagingWithValueList = {
+              ...prev,
+              // reflect accepted -> ACTIVE and sync fields from the chosen existing criterion
+              criterion_adjudication_status: 'ACTIVE',
+              code,
+              display_name,
+              description,
+              input_type_id,
+              // keep values in sync with what we just saved
+              criterion_value_list: values ?? prev.criterion_value_list ?? [],
+            }
+            onStagingUpdated?.(updated)
+            return updated
+          })
         })
         .catch((err) => {
           console.error(err)
@@ -179,11 +252,14 @@ export function CriteriaAnnotationVerification({
   }
   const onInputTypeSelected = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const inputTypeId = +event.target.value
-    setSelectedInputTypeId(inputTypeId)
+    setStagingCriterion((prev) => ({
+      ...prev,
+      input_type_id: inputTypeId,
+    }))
     const isListSelected = checkIsList(inputTypeId)
     setIsList(isListSelected)
     if (!isListSelected) {
-      setSelectedValues([])
+      setStagingCriterion((prev) => ({ ...prev, criterion_value_list: [] }))
     }
     setCanPublish(false)
   }
@@ -213,23 +289,25 @@ export function CriteriaAnnotationVerification({
     }
     setIsCreating(true)
     return createValue(newValue).then((v) => {
-      const newOption: MatchFormFieldOption = {
-        value: v.id,
-        label: v.value_string || '',
-      }
       setLookupValues((prev) => [...prev, v])
-      setSelectedValues((prevSelected) => [...prevSelected, newOption])
       setIsCreating(false)
       setCanPublish(false)
-      return newOption
+      return { value: v.id, label: v.value_string || '' }
     })
   }
 
   const formChanged = () => setCanPublish((prev) => (prev ? !prev : prev))
-
+  const existingCodeOptions = criteria.map((c) => ({
+    value: c.code,
+    label: c.code,
+  }))
   return (
     <div className="my-4 p-4 border border-gray-400">
-      <form ref={formRef} onChange={formChanged}>
+      <form
+        key={existingCriterion?.id ?? stagingCriterion.id}
+        ref={formRef}
+        onChange={formChanged}
+      >
         <div className="flex justify-between items-center mb-2">
           <h1>Status: {status}</h1>
           <div className="flex items-center">
@@ -240,7 +318,6 @@ export function CriteriaAnnotationVerification({
               canPublish={canPublish}
               save={save}
               publish={publish}
-              edit={edit}
               accept={accept}
             />
           </div>
@@ -256,11 +333,76 @@ export function CriteriaAnnotationVerification({
         />
         <Field
           config={{
-            type: 'text',
+            type: 'multiselect',
             name: 'code',
             label: 'Code',
-            readOnly: !isEditable,
-            defaultValue: stagingCriterion.code || '',
+            options: [
+              {
+                value: stagingCriterion.code,
+                label: stagingCriterion.code,
+              },
+              ...existingCodeOptions,
+            ].filter(
+              (option, idx, arr) =>
+                arr.findIndex(
+                  (item) =>
+                    item.value === option.value && item.label === option.label
+                ) === idx
+            ),
+            disabled: !isCodeEditable,
+            closeOnChangedValue: true,
+            hasSelectAll: false,
+            onCreateOption: (
+              newCode: string
+            ): Promise<{
+              label: string
+              value: string
+            }> =>
+              new Promise((resolve) =>
+                setTimeout(
+                  () =>
+                    resolve({
+                      label: newCode,
+                      value: newCode,
+                    }),
+                  100
+                )
+              ),
+          }}
+          value={
+            existingCriterion
+              ? [
+                  {
+                    value: existingCriterion.code,
+                    label: existingCriterion.code,
+                  },
+                ]
+              : [{ value: stagingCriterion.code, label: stagingCriterion.code }]
+          }
+          onChange={(newCodes: [{ label: string; value: string }]) => {
+            if (newCodes.length) {
+              const newCode = newCodes[newCodes.length - 1].value
+              const newExistingCriterion = criteria.find(
+                (c) => c.code === newCode
+              )
+              setExistingCriterion(() => newExistingCriterion)
+              if (newExistingCriterion) {
+                setIsList(checkIsList(newExistingCriterion.input_type_id))
+              } else {
+                setStagingCriterion((prev) => ({
+                  ...prev,
+                  criterion_adjudication_status:
+                    prev.code === newCode
+                      ? prev.criterion_adjudication_status
+                      : 'NEW',
+                  code: newCode,
+                }))
+                setIsList(checkIsList(stagingCriterion.input_type_id))
+              }
+            } else {
+              setExistingCriterion(() => undefined)
+              setIsList(false)
+            }
           }}
         />
         <Field
@@ -269,7 +411,9 @@ export function CriteriaAnnotationVerification({
             name: 'displayName',
             label: 'Display Name',
             readOnly: !isEditable,
-            defaultValue: stagingCriterion.display_name || '',
+            defaultValue: existingCriterion
+              ? existingCriterion.display_name
+              : stagingCriterion.display_name || '',
           }}
         />
         <Field
@@ -278,7 +422,9 @@ export function CriteriaAnnotationVerification({
             name: 'description',
             label: 'Description',
             readOnly: !isEditable,
-            defaultValue: stagingCriterion.description || '',
+            defaultValue: existingCriterion
+              ? existingCriterion.description
+              : stagingCriterion.description || '',
           }}
         />
       </form>
@@ -294,7 +440,11 @@ export function CriteriaAnnotationVerification({
           })),
           readOnly: !isEditable,
         }}
-        value={selectedInputTypeId}
+        value={
+          existingCriterion
+            ? existingCriterion.input_type_id || 0
+            : stagingCriterion.input_type_id || 0
+        }
         onChange={onInputTypeSelected}
       />
       {isList && (
@@ -312,9 +462,50 @@ export function CriteriaAnnotationVerification({
             isLoading: isCreating,
             disabled: !isEditable,
           }}
-          value={selectedValues}
-          onChange={(newValues) => {
-            setSelectedValues(newValues)
+          value={
+            existingCriterion
+              ? existingCriterion?.values.map((v) => ({
+                  value: v.id,
+                  label: v.value_string || '',
+                }))
+              : stagingCriterion.criterion_value_list?.map((v) => ({
+                  value: v.id,
+                  label: v.value_string || '',
+                })) || []
+          }
+          onChange={(newValues: { value: number; label: string }[]) => {
+            setStagingCriterion((prev) => {
+              const newSelectedValues: CriteriaValue[] = newValues.map(
+                (item) => {
+                  // Check current selection in state
+                  const inCurrentList = prev.criterion_value_list?.find(
+                    (v) => v.id === item.value
+                  )
+                  if (inCurrentList) return inCurrentList
+
+                  // Check updated lookupValues from props
+                  const inLookup = lookupValues.find((v) => v.id === item.value)
+                  if (inLookup) return inLookup
+
+                  // Fallback for newly created values not yet in state/props
+                  return {
+                    id: item.value,
+                    value_string: item.label,
+                    description: item.label,
+                    is_numeric: false,
+                    active: true,
+                    operator: 'eq',
+                    unit_id: 1,
+                    unit_name: 'none',
+                  } as CriteriaValue
+                }
+              )
+
+              return {
+                ...prev,
+                criterion_value_list: newSelectedValues,
+              }
+            })
             setCanPublish(false)
           }}
         />
@@ -329,15 +520,13 @@ function ActionButtons({
   canPublish,
   save,
   publish,
-  edit,
   accept,
 }: {
-  status: CriterionStaging['criterion_adjudication_status']
+  status: Status
   isSendingReq: boolean
   canPublish: boolean
   save: () => void
   publish: () => void
-  edit: () => void
   accept: () => void
 }) {
   if (status === 'NEW' || status === 'IN_PROCESS') {
@@ -362,19 +551,9 @@ function ActionButtons({
     )
   } else if (status === 'EXISTING') {
     return (
-      <>
-        <Button
-          size="small"
-          otherClassName="mr-4"
-          disabled={isSendingReq}
-          onClick={edit}
-        >
-          Edit
-        </Button>
-        <Button size="small" onClick={accept} disabled={isSendingReq}>
-          Accept
-        </Button>
-      </>
+      <Button size="small" onClick={accept} disabled={isSendingReq}>
+        Accept
+      </Button>
     )
   }
   return null

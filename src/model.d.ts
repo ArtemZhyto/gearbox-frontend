@@ -1,14 +1,22 @@
 export type ApiStatus = 'not started' | 'sending' | 'success' | 'error'
 type Site = {
-  id: number
-  active: boolean
   name: string
+  country: string | null
+  city: strin | null
+  state: string | null
+  zip: string | null
+  create_date: string | null
+  location_lat: string | null
+  location_long: string | null
+  id: number
 }
 
 export type Study = {
   id: number
   code: string
   name: string
+  create_date: string | null
+  active: boolean
   description: string
   links: { name: string; href: string }[]
   sites: Site[]
@@ -278,4 +286,39 @@ export type CriterionStagingPublish = {
 export type Unit = {
   id: number
   name: string
+}
+
+export type PreAnnotatedItem = {
+  span: [number, number, string]
+  matched_models: string[]
+  is_standard_gb_var: boolean
+}
+
+export type EntityItem = {
+  id: number
+  label: string
+  start_offset: number
+  end_offset: number
+  meta: unknown
+}
+
+export type AnnotationSource = 'entity' | 'pre'
+export type RawCriterion = {
+  text: string
+  id: number
+  uuid: string | null
+  nct: string | null
+  pre_annotated: PreAnnotatedItem[] | null
+  entities: EntityItem[] | null
+
+  // Present in your payload; keep them typed so parsing is lossless
+  Comments: unknown[]
+  relations: unknown[]
+}
+
+export type HighlightSpan = {
+  start: number
+  end: number
+  label?: string
+  source: AnnotationSource
 }
